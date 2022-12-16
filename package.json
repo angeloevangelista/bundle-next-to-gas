@@ -1,0 +1,29 @@
+{
+  "name": "bundle-next-to-gas",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "fire": "yarn build && rm ./temp/next-project/out/_next/static/chunks/pages/*.js && yarn gas-push",
+    "gas-push": "clasp push",
+    "build": "ts-node src/index.ts"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^9.0.13",
+    "@types/google-apps-script": "^1.0.56",
+    "@types/jsdom": "^20.0.1",
+    "@types/node": "^18.11.15",
+    "@types/rimraf": "^3.0.2",
+    "next": "^13.0.7",
+    "ts-loader": "^9.4.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.4",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1"
+  },
+  "dependencies": {
+    "fs-extra": "^11.1.0",
+    "jsdom": "^20.0.3",
+    "rimraf": "^3.0.2"
+  }
+}
