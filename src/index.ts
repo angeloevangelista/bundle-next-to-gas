@@ -29,7 +29,7 @@ async function generateGasBundle() {
     __dirname,
     "..",
     "..",
-    "lar-go-whirlpool"
+    "next-project"
   );
 
   const nextProjectCopyPath = path.resolve(tempFolderPath, "next-project");
@@ -133,7 +133,7 @@ async function generateGasBundle() {
 
   if (!nextProjectEntryComponentImportsUseEffect) {
     nextProjectEntryComponentContent = [
-      `import { useEffect } from 'react'`,
+      `import { useEffect } from 'react';`,
       ...nextProjectEntryComponentContent.split("\n"),
     ].join("\n");
   }
@@ -144,7 +144,7 @@ async function generateGasBundle() {
 
   if (!nextProjectEntryComponentImportsUseState) {
     nextProjectEntryComponentContent = [
-      `import { useState } from 'react'`,
+      `import { useState } from 'react';`,
       ...nextProjectEntryComponentContent.split("\n"),
     ].join("\n");
   }
@@ -176,16 +176,38 @@ async function generateGasBundle() {
         );
 
       if (itsComponentPropUsageLine) {
-        acc.push("<AppRoutes />");
-        line = `{/*${line}*/}`;
+        const startIndexOfComponentUsage = line.indexOf("<Component");
+        const endIndexOfComponentUsage = line.indexOf("/>") + 2;
+
+        line = [
+          line.substring(0, startIndexOfComponentUsage),
+          "<AppRoutes />",
+          line.substring(endIndexOfComponentUsage),
+        ].join("");
       }
 
       const itsExportLine = /export default.*/gi.test(line.trim());
 
       if (itsExportLine) {
-        const componentName = line.replace(/;/gi, "").split(" ").pop();
+        const itsDeclarationDefaultExport = /(export default function)/.test(
+          line
+        );
 
-        line = `/*${line}*/`;
+        if (itsDeclarationDefaultExport) {
+          line = line.replace("export default", "");
+        }
+
+        const componentName = itsDeclarationDefaultExport
+          ? line
+              .trim()
+              .split(" ")
+              .at(1)
+              ?.replace(/(\({|\()/gi, "")
+          : line.replace(/;/gi, "").split(" ").pop();
+
+        if (!itsDeclarationDefaultExport) {
+          line = `/*${line}*/`;
+        }
 
         acc = [
           ...acc,
@@ -216,7 +238,7 @@ async function generateGasBundle() {
     nextProjectEntryComponentContent
   );
 
-  console.log("info: updating next project config");
+  console.log("info: updating next.config.js");
   const nextConfigPath = path.resolve(nextProjectCopyPath, "next.config.js");
 
   const nextConfigBuffer = await readFile(nextConfigPath);
@@ -250,6 +272,14 @@ async function generateGasBundle() {
       },
     };
   }
+
+  tempNextConfigObject = {
+    ...tempNextConfigObject,
+    eslint: {
+      ...tempNextConfigObject.eslint,
+      ignoreDuringBuilds: true,
+    },
+  };
 
   const newNextConfigContent = [
     `/** @type {import('next').NextConfig} */`,
