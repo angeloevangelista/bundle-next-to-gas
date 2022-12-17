@@ -10,3 +10,4 @@ export * from "./deleteFolder";
 
 export * from "./executeCommand";
 export * from "./checkIfPathExists";
+export * from "./extractFilePaths";
