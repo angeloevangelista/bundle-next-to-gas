@@ -1,5 +1,14 @@
 {
   "name": "bundle-next-to-gas",
+  "author": {
+    "name": "Angelo Evangelista",
+    "email": "angeloevan.ane@gmail.com",
+    "url": "https://github.com/angeloevangelista"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/angeloevangelista/bundle-next-to-gas.git"
+  },
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
