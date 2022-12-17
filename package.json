@@ -13,7 +13,7 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "fire": "yarn build && rm ./temp/next-project/out/_next/static/chunks/pages/*.js && yarn gas-push",
+    "fire": "yarn build && yarn gas-push",
     "gas-push": "clasp push",
     "build": "ts-node src/index.ts"
   },
