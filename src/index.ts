@@ -96,6 +96,20 @@ async function generateGasBundle() {
     );
   });
 
+  const indexPageExists = await checkIfPathExists(
+    path.resolve(nextProjectCopyPagesPath, "index.tsx")
+  );
+
+  if (indexPageExists) {
+    pagesImportations.push(
+      `const IndexPageComponent = require('./index.tsx').default;`
+    );
+
+    pagesRouteDeclarations.push(
+      `<Route path="/" element={<IndexPageComponent />} />`
+    );
+  }
+
   const routesComponentContent = [
     `import { Route, Routes } from 'react-router-dom';`,
     ...pagesImportations,
