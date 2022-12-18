@@ -101,12 +101,22 @@ async function generateGasBundle() {
   );
 
   if (indexPageExists) {
+    pagesImportations.push(`const IndexPage = require('./index.tsx').default;`);
+
+    pagesRouteDeclarations.push(`<Route path="/" element={<IndexPage />} />`);
+  }
+
+  const notFoundPageExists = await checkIfPathExists(
+    path.resolve(nextProjectCopyPagesPath, "404.tsx")
+  );
+
+  if (notFoundPageExists) {
     pagesImportations.push(
-      `const IndexPageComponent = require('./index.tsx').default;`
+      `const NotFoundPage = require('./404.tsx').default;`
     );
 
     pagesRouteDeclarations.push(
-      `<Route path="/" element={<IndexPageComponent />} />`
+      `<Route path="*" element={<NotFoundPage />} />`
     );
   }
 
