@@ -1,6 +1,7 @@
 import path from "path";
 import jsdom from "jsdom";
 import { NextConfig } from "next";
+import mimeTypes from "mime-types";
 
 import {
   readFile,
@@ -577,6 +578,105 @@ async function generateGasBundle() {
 
   console.log("info: updating bundle entrypoint");
   await writeFile(bundleEntryPath, bundleEntryContent);
+
+  console.log("info: converting assets to base64 data");
+  const assetsPath = path.resolve(staticBundlePath, "assets");
+
+  const assetsFilesPaths = extractFilePaths(assetsPath);
+
+  const convertAssetsToBase64Promises = assetsFilesPaths.map(
+    async (filePath) => {
+      const fileBuffer = await readFile(filePath);
+
+      const fileMimetype = mimeTypes.lookup(filePath);
+
+      const fileBase64Reference = `data:${fileMimetype};base64, ${fileBuffer.toString(
+        "base64"
+      )}`;
+
+      await writeFile(
+        filePath.replace(path.extname(filePath), ".txt"),
+        fileBase64Reference
+      );
+    }
+  );
+
+  await Promise.all(convertAssetsToBase64Promises);
+
+  console.log("info: updating assets references to use base64");
+  const assetsReferencePattern = new RegExp("/assets/", "gi");
+
+  const bundledFilesThatUseAssetsPathsPromises = extractFilePaths(
+    staticBundlePath
+  ).map<Promise<{ filePath: string; usesAssets: boolean }>>(
+    async (filePath) => {
+      if (!/.(html)\b/gi.test(filePath)) {
+        return {
+          filePath,
+          usesAssets: false,
+        };
+      }
+
+      const fileBuffer = await readFile(filePath);
+      const fileContent = fileBuffer.toString();
+
+      const usesAssets = assetsReferencePattern.test(fileContent);
+
+      return {
+        filePath,
+        usesAssets,
+      };
+    }
+  );
+
+  const bundledFilesThatUseAssetsResult = await Promise.all(
+    bundledFilesThatUseAssetsPathsPromises
+  );
+
+  const bundledFilesThatUseAssetsPaths = bundledFilesThatUseAssetsResult
+    .filter(({ usesAssets }) => usesAssets)
+    .map(({ filePath }) => filePath);
+
+  const updateAssetsReferencesToBase64Promises =
+    bundledFilesThatUseAssetsPaths.map(async (filePath) => {
+      const fileBuffer = await readFile(filePath);
+      let fileContent = fileBuffer.toString();
+
+      const assetsReferences = Array.from(
+        fileContent.matchAll(assetsReferencePattern)
+      ).map((p) => {
+        const slicedContent = p.input?.substring(p.index!);
+
+        const endIndexOfOccurrence = slicedContent?.indexOf('"');
+
+        return slicedContent?.substring(0, endIndexOfOccurrence);
+      });
+
+      const replaceForBase64Promises = assetsReferences
+        .filter((p) => !!p?.trim())
+        .map((p) => String(p))
+        .map(async (assetReference) => {
+          const encodedAssetPath = path.resolve(
+            assetsPath,
+            assetReference
+              .replace(assetsReferencePattern, "")
+              .replace(path.extname(assetReference), ".txt")
+          );
+
+          const encodedAssetBuffer = await readFile(encodedAssetPath);
+
+          fileContent = fileContent.replace(
+            assetReference,
+            encodedAssetBuffer.toString()
+          );
+        });
+
+      await Promise.all(replaceForBase64Promises);
+
+      await writeFile(filePath, fileContent);
+    });
+
+  await Promise.all(updateAssetsReferencesToBase64Promises);
 }
 
 generateGasBundle();
