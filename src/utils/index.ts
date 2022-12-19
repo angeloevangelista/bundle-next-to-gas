@@ -1,5 +1,6 @@
 export * from "./copyFile";
 export * from "./readFile";
+export * from "./listFiles";
 export * from "./writeFile";
 export * from "./deleteFile";
 export * from "./renameFile";

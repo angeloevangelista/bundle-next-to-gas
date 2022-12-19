@@ -27,6 +27,7 @@
     "clasp": "^1.0.0",
     "fs-extra": "^11.1.0",
     "jsdom": "^20.0.3",
+    "loading-cli": "^1.1.0",
     "mime-types": "^2.1.35",
     "next": "^13.0.7",
     "rimraf": "^3.0.2",

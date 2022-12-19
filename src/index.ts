@@ -2,6 +2,7 @@ import path from "path";
 import jsdom from "jsdom";
 import { NextConfig } from "next";
 import mimeTypes from "mime-types";
+import loading from "loading-cli";
 
 import {
   readFile,
@@ -12,18 +13,24 @@ import {
   executeCommand,
   copyFolder,
   copyFile,
-  renameFile,
   extractFilePaths,
+  listFiles,
 } from "./utils";
 
 async function generateGasBundle() {
+  const load = loading({
+    frames: ["⠇", "⠏", "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"],
+  });
+
+  load.start().text = "info: removing temp folder if exists";
+
   const tempFolderPath = path.resolve(__dirname, "..", "temp");
 
   const tempFolderExists = await checkIfPathExists(tempFolderPath);
 
   if (tempFolderExists) await deleteFolder(tempFolderPath);
 
-  console.log("info: creating temp folder");
+  load.succeed().start().text = "info: creating temp folder";
   await createFolder(tempFolderPath);
 
   const originalNextProjectPath = path.resolve(
@@ -35,20 +42,20 @@ async function generateGasBundle() {
 
   const nextProjectCopyPath = path.resolve(tempFolderPath, "next-project");
 
-  console.log("info: copying next project to temp folder");
+  load.succeed().start().text = "info: copying next project to temp folder";
   await copyFolder(originalNextProjectPath, nextProjectCopyPath, {
     dereference: true,
     recursive: true,
   });
 
-  console.log("info: removing previous builds and packages");
+  load.succeed().start().text = "info: removing previous builds and packages";
   await Promise.all(
     ["out", ".next", "node_modules"].map((folder) =>
       deleteFolder(path.resolve(nextProjectCopyPath, folder))
     )
   );
 
-  console.log("info: creating routes.tsx component");
+  load.succeed().start().text = "info: creating routes.tsx component";
   const nextProjectCopyPagesPath = path.resolve(
     nextProjectCopyPath,
     "src",
@@ -137,7 +144,7 @@ async function generateGasBundle() {
     routesComponentContent
   );
 
-  console.log("info: updating _app.tsx to use routes.tsx");
+  load.succeed().start().text = "info: updating _app.tsx to use routes.tsx";
   const nextProjectEntryComponentPath = path.resolve(
     nextProjectCopyPath,
     "src",
@@ -263,7 +270,7 @@ async function generateGasBundle() {
     nextProjectEntryComponentContent
   );
 
-  console.log("info: updating next.config.js");
+  load.succeed().start().text = "info: updating next.config.js";
   const nextConfigPath = path.resolve(nextProjectCopyPath, "next.config.js");
 
   const nextConfigBuffer = await readFile(nextConfigPath);
@@ -315,7 +322,8 @@ async function generateGasBundle() {
 
   await writeFile(nextConfigPath, newNextConfigContent);
 
-  console.log("info: updating NextRouter usages to custom Router abstraction");
+  load.succeed().start().text =
+    "info: updating NextRouter usages to custom Router abstraction";
   const nextProjectCopySrcPath = path.resolve(nextProjectCopyPath, "src");
 
   const componentsThatUseNextRouterHookPathsPromises = extractFilePaths(
@@ -398,7 +406,7 @@ async function generateGasBundle() {
 
   await Promise.all(updateNextRouterUsageToNavigatePromises);
 
-  console.log("info: creating useRouter hook");
+  load.succeed().start().text = "info: creating useRouter hook";
 
   const useRouterHookContent = [
     `import { useNavigate } from 'react-router-dom';`,
@@ -456,7 +464,7 @@ async function generateGasBundle() {
     useRouterHookContent
   );
 
-  console.log("info: building project");
+  load.succeed().start().text = "info: building project";
   await executeCommand(
     [
       "yarn add react-router-dom@^6.5.0",
@@ -469,117 +477,7 @@ async function generateGasBundle() {
 
   const staticBundlePath = path.resolve(nextProjectCopyPath, "out");
 
-  await copyFile(
-    path.resolve(__dirname, "..", "appsscript.json"),
-    path.resolve(staticBundlePath, "appsscript.json")
-  );
-
-  await copyFile(
-    path.resolve(__dirname, "gas-scripts", "fileServer.ts"),
-    path.resolve(staticBundlePath, "fileServer.ts")
-  );
-
-  console.log("info: updating bundle script references");
-  const bundleEntryPath = path.resolve(staticBundlePath, "index.html");
-
-  const bundleEntryBuffer = await readFile(bundleEntryPath);
-
-  let bundleEntryContent = bundleEntryBuffer.toString();
-
-  var bundleEntryDOM = new jsdom.JSDOM(bundleEntryContent);
-
-  const scriptElements = Array.from(
-    bundleEntryDOM.window.document.querySelectorAll("script")
-  ).filter((scriptElement) => scriptElement.src);
-
-  const staticFilesPrefix = "<?= ScriptApp.getService().getUrl()?>/static";
-
-  const updateProjectScriptsPromises = scriptElements.map(
-    async (scriptElement) => {
-      const physicalScriptFilePath = path.join(
-        staticBundlePath,
-        scriptElement.src
-      );
-
-      await renameFile(
-        physicalScriptFilePath,
-        path.join(staticBundlePath, scriptElement.src.replace(".js", ".html"))
-      );
-
-      scriptElement.src = `${staticFilesPrefix}?filePath=${scriptElement.src
-        .replace(".js", "")
-        .substring(1)}`;
-    }
-  );
-
-  await Promise.all(updateProjectScriptsPromises);
-
-  console.log("info: updating bundle style references");
-  const stylesheetLinkElements = Array.from(
-    bundleEntryDOM.window.document.querySelectorAll("link")
-  )
-    .filter(
-      (stylesheetLinkElement) => stylesheetLinkElement.rel === "stylesheet"
-    )
-    .reduce<HTMLLinkElement[]>(
-      (acc, stylesheetLinkElement) =>
-        acc.some((p) => p.href === stylesheetLinkElement.href)
-          ? acc
-          : [...acc, stylesheetLinkElement],
-      []
-    );
-
-  const updateProjectStylesheetsPromises = stylesheetLinkElements.map<
-    Promise<string>
-  >(async (stylesheetLinkElement) => {
-    const physicalStylesFilePath = path.join(
-      staticBundlePath,
-      stylesheetLinkElement.href
-    );
-
-    const styleElementBuffer = await readFile(physicalStylesFilePath);
-
-    stylesheetLinkElement.remove();
-
-    await writeFile(
-      physicalStylesFilePath,
-      `<style>${styleElementBuffer.toString()}</style>`
-    );
-
-    await renameFile(
-      physicalStylesFilePath,
-      path.join(
-        staticBundlePath,
-        stylesheetLinkElement.href.replace(".css", ".html")
-      )
-    );
-
-    return `<?!= include('${stylesheetLinkElement.href
-      .replace(".css", "")
-      .substring(1)}'); ?>`;
-  });
-
-  const stylesheetIncludes = await Promise.all(
-    updateProjectStylesheetsPromises
-  );
-
-  bundleEntryContent =
-    bundleEntryDOM.window.document.body.parentElement!.outerHTML;
-
-  const startOfEndOfBodyIndex = bundleEntryContent
-    .toUpperCase()
-    .indexOf("</BODY>");
-
-  bundleEntryContent = [
-    bundleEntryContent.substring(0, startOfEndOfBodyIndex),
-    stylesheetIncludes.join(""),
-    bundleEntryContent.substring(startOfEndOfBodyIndex),
-  ].join("");
-
-  console.log("info: updating bundle entrypoint");
-  await writeFile(bundleEntryPath, bundleEntryContent);
-
-  console.log("info: converting assets to base64 data");
+  load.succeed().start().text = "info: converting assets to base64 data";
   const assetsPath = path.resolve(staticBundlePath, "assets");
 
   const assetsFilesPaths = extractFilePaths(assetsPath);
@@ -603,20 +501,14 @@ async function generateGasBundle() {
 
   await Promise.all(convertAssetsToBase64Promises);
 
-  console.log("info: updating assets references to use base64");
+  load.succeed().start().text =
+    "info: updating assets references to use base64";
   const assetsReferencePattern = new RegExp("/assets/", "gi");
 
   const bundledFilesThatUseAssetsPathsPromises = extractFilePaths(
     staticBundlePath
   ).map<Promise<{ filePath: string; usesAssets: boolean }>>(
     async (filePath) => {
-      if (!/.(html)\b/gi.test(filePath)) {
-        return {
-          filePath,
-          usesAssets: false,
-        };
-      }
-
       const fileBuffer = await readFile(filePath);
       const fileContent = fileBuffer.toString();
 
@@ -677,6 +569,113 @@ async function generateGasBundle() {
     });
 
   await Promise.all(updateAssetsReferencesToBase64Promises);
+
+  load.succeed().start().text = "info: getting entrypoint DOM";
+  const bundleEntryPath = path.resolve(staticBundlePath, "index.html");
+
+  const bundleEntryBuffer = await readFile(bundleEntryPath);
+
+  let bundleEntryContent = bundleEntryBuffer.toString();
+
+  var bundleEntryDOM = new jsdom.JSDOM(bundleEntryContent);
+
+  load.succeed().start().text = "info: updating bundle script references";
+  const scriptElements = Array.from(
+    bundleEntryDOM.window.document.querySelectorAll("script")
+  ).filter((scriptElement) => scriptElement.src);
+
+  const updateScriptsReferencesToContentScriptTagsPromises = scriptElements.map(
+    async (scriptElement) => {
+      const physicalScriptFilePath = path.join(
+        staticBundlePath,
+        scriptElement.src
+      );
+
+      const scriptBuffer = await readFile(physicalScriptFilePath);
+
+      const scriptMimetype = mimeTypes.lookup(physicalScriptFilePath);
+
+      const fileBase64Reference = `data:${scriptMimetype};base64, ${scriptBuffer.toString(
+        "base64"
+      )}`;
+
+      scriptElement.type = String(scriptMimetype);
+      scriptElement.src = fileBase64Reference;
+    }
+  );
+
+  await Promise.all(updateScriptsReferencesToContentScriptTagsPromises);
+
+  load.succeed().start().text = "info: updating bundle style/links references";
+  const linkElements = Array.from(
+    bundleEntryDOM.window.document.querySelectorAll("link")
+  ).filter((linkElement) => linkElement.rel === "stylesheet");
+
+  const updateLinksReferencesToBase64Promises = linkElements.map(
+    async (linkElement) => {
+      const physicalLinkFilePath = path.join(
+        staticBundlePath,
+        linkElement.href
+      );
+
+      const linkPointsToPhysicalFile = await checkIfPathExists(
+        physicalLinkFilePath
+      );
+
+      if (!linkPointsToPhysicalFile) return;
+
+      const linkBuffer = await readFile(physicalLinkFilePath);
+
+      const linkMimetype = mimeTypes.lookup(physicalLinkFilePath);
+
+      const fileBase64Reference = `data:${linkMimetype};base64, ${linkBuffer.toString(
+        "base64"
+      )}`;
+
+      linkElement.type = String(linkMimetype);
+      linkElement.href = fileBase64Reference;
+    }
+  );
+
+  await Promise.all(updateLinksReferencesToBase64Promises);
+
+  load.succeed().start().text =
+    "info: updating entrypoint DOM with updated scripts/styles";
+  bundleEntryContent =
+    bundleEntryDOM.window.document.body.parentElement!.outerHTML;
+
+  load.succeed().start().text = "info: updating bundle entrypoint";
+  await writeFile(bundleEntryPath, bundleEntryContent);
+
+  load.succeed().start().text = "info: copying gas files to output folder";
+  const gasFilesPath = path.resolve(tempFolderPath, "gas");
+
+  await createFolder(gasFilesPath);
+
+  const nextOutFirstLevelFilesPaths = await listFiles(staticBundlePath);
+
+  const copyFilesPromises = nextOutFirstLevelFilesPaths
+    .map(async (fileName) => {
+      await copyFile(
+        path.resolve(staticBundlePath, fileName),
+        path.resolve(gasFilesPath, fileName)
+      );
+    })
+    .concat([
+      copyFile(
+        path.resolve(__dirname, "..", "appsscript.json"),
+        path.resolve(gasFilesPath, "appsscript.json")
+      ),
+
+      copyFile(
+        path.resolve(__dirname, "gas-scripts", "fileServer.ts"),
+        path.resolve(gasFilesPath, "fileServer.ts")
+      ),
+    ]);
+
+  await Promise.all(copyFilesPromises);
+
+  load.succeed();
 }
 
 generateGasBundle();

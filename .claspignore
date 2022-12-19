@@ -1,1 +1,4 @@
 **/*.js
+404.html
+routes.html
+useRouter.html

@@ -554,6 +554,11 @@ colorette@^2.0.14:
   resolved "https://registry.yarnpkg.com/colorette/-/colorette-2.0.19.tgz#cdf044f47ad41a0f4b56b3a0d5b4e6e1a2d5a798"
   integrity sha512-3tlv/dIP7FWvj3BsbHrGLJ6l/oKh1O3TcgBqMn+yyCagOxc23fyzDS6HypQbgxWbkpDnf52p1LuR4eWDQ/K9WQ==
 
+colors-cli@^1.0.26:
+  version "1.0.29"
+  resolved "https://registry.yarnpkg.com/colors-cli/-/colors-cli-1.0.29.tgz#121346c8e3f57344c3df38ee4641b6e4824718bd"
+  integrity sha512-S3wbmkI5Hmw7V9zM+xwxqLQAm2Z21epMtfEzErzhA/ToGNSpMOMA1Y842O56tiH5La9ZGMasAGVUKFYfb9RG9g==
+
 combined-stream@^1.0.8:
   version "1.0.8"
   resolved "https://registry.yarnpkg.com/combined-stream/-/combined-stream-1.0.8.tgz#c3d45a8b34fd730631a110a8a2520682b31d5a7f"
@@ -1000,6 +1005,13 @@ loader-runner@^4.2.0:
   version "4.3.0"
   resolved "https://registry.yarnpkg.com/loader-runner/-/loader-runner-4.3.0.tgz#c1b4a163b99f614830353b16755e7149ac2314e1"
   integrity sha512-3R/1M+yS3j5ou80Me59j7F9IMs4PXs3VqRrm0TU3AbKPxlmpoY1TNscJV/oGJXo8qCatFGTfDbY6W6ipGOYXfg==
+
+loading-cli@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/loading-cli/-/loading-cli-1.1.0.tgz#3457edaa3290439ad0061755174363a8091d56bc"
+  integrity sha512-r6Kj0Y3d3isT4vvJ0tFlND1CcLkpatWmlgQs/PEfnSofJSHZwAbsqexnpQEDj4nlxSXEqFWh/Wu2iQXAAZRPNQ==
+  dependencies:
+    colors-cli "^1.0.26"
 
 locate-path@^5.0.0:
   version "5.0.0"
