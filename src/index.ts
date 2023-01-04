@@ -88,14 +88,15 @@ async function generateGasBundle() {
         .replace(".tsx", "")
         .split(path.sep)
         .map((p) => `${p.substring(0, 1).toUpperCase()}${p.substring(1)}`)
-        .join("") + "Page";
+        .join("")
+        .replace(/(\[|])/g, '') + "Page";
 
     const componentImport = `const ${componentName} = require('.${partialPageComponentPath}').default;`;
 
     const componentRouteElement = `<Route path="${partialPageComponentPath.replace(
       /.tsx|\/index.tsx/gi,
       ""
-    )}" element={<${componentName} />} />`;
+    ).replace(/\[/g, ':').replace(/]/g, '')}" element={<${componentName} />} />`;
 
     pagesImportations.push(componentImport);
     pagesRouteDeclarations.push(componentRouteElement);
@@ -411,50 +412,54 @@ async function generateGasBundle() {
   load.succeed().start().text = "info: creating useRouter hook";
 
   const useRouterHookContent = [
-    `import { useNavigate } from 'react-router-dom';`,
+    `import { useNavigate, useParams } from 'react-router-dom';`,
     `import { NextRouter, useRouter } from 'next/router';`,
     `import { createContext, useContext, useEffect, useState } from 'react';`,
 
     `const RouterContext = createContext<NextRouter>({} as NextRouter);`,
 
     `const RouterProvider: React.FC<{ children: JSX.Element }> = ({ children }) => {`,
-    `	const [router, setRouter] = useState<NextRouter>();`,
-    `	const nextRouter = useRouter();`,
+    `	 const [router, setRouter] = useState<NextRouter>();`,
+    `	 const nextRouter = useRouter();`,
 
-    `	const navigate = useNavigate();`,
-    `	const customRouter: NextRouter = {`,
-    `		push(url, _, __) {`,
-    `			return new Promise<boolean>((resolve, _) => {`,
-    `				navigate(url.toString());`,
-    `				resolve(true);`,
-    `			});`,
-    `		},`,
-    `		back() {`,
-    `			navigate(-1);`,
-    `		},`,
-    `	} as NextRouter;`,
+    `	 const params = useParams();`,
+    `	 const navigate = useNavigate();`,
+    `	 const customRouter: NextRouter = {`,
+    `    query: {`,
+    `	     ...params,`,
+    `    },`,
+    `	 	 push(url, _, __) {`,
+    `      return new Promise<boolean>((resolve, _) => {`,
+    `	 	 		 navigate(url.toString());`,
+    `	 	 		 resolve(true);`,
+    `	 	   });`,
+    `	 	 },`,
+    `	 	 back() {`,
+    `      navigate(-1);`,
+    `	 	 },`,
+    `  } as NextRouter;`,
 
-    `	useEffect(() => {`,
-    `		setRouter(`,
-    `			Object.keys(nextRouter).reduce(`,
-    `				(acc, routerKey) => ({`,
-    `					...acc,`,
-    `					[routerKey]:`,
-    `						(customRouter as { [key: string]: any })[routerKey] ||`,
-    `						(nextRouter as { [key: string]: any })[routerKey],`,
-    `				}),`,
-    `				{},`,
-    `			) as NextRouter,`,
-    `		);`,
-    `	}, []);`,
-
-    `	return router ? (`,
-    `		<RouterContext.Provider value={{ ...router }}>`,
-    `			{children}`,
-    `		</RouterContext.Provider>`,
-    `	) : (`,
-    `		<></>`,
+    `useEffect(() => {`,
+    `	setRouter(`,
+    `		Object.keys(nextRouter).reduce(`,
+    `			(acc, routerKey) => ({`,
+    `				...acc,`,
+    `				[routerKey]:`,
+    `					(customRouter as { [key: string]: any })[routerKey] ||`,
+    `					(nextRouter as { [key: string]: any })[routerKey],`,
+    `			}),`,
+    `			{},`,
+    `		) as NextRouter,`,
     `	);`,
+    `}, []);`,
+
+    `  return router ? (`,
+    `    <RouterContext.Provider value={{ ...router }}>`,
+    `      {children}`,
+    `    </RouterContext.Provider>`,
+    `  ) : (`,
+    `  	<></>`,
+    `  );`,
     `};`,
 
     `export { RouterProvider };`,
@@ -642,11 +647,11 @@ async function generateGasBundle() {
   await Promise.all(updateLinksReferencesToBase64Promises);
 
   load.succeed().start().text = "info: setting application URL on localStorage";
-  const setLocalStorageScriptElement = bundleEntryDOM.window.document.createElement(
+  const setGasDataScriptElement = bundleEntryDOM.window.document.createElement(
     "script",
   );
 
-  setLocalStorageScriptElement.innerHTML = `
+  setGasDataScriptElement.innerHTML = `
     const appUrl = <?= ScriptApp.getService().getUrl()?>;
     const userEmail = <?= Session.getEffectiveUser().getEmail()?>;
 
@@ -656,7 +661,7 @@ async function generateGasBundle() {
     }
   `;
 
-  bundleEntryDOM.window.document.body.appendChild(setLocalStorageScriptElement)
+  bundleEntryDOM.window.document.body.appendChild(setGasDataScriptElement)
 
   load.succeed().start().text =
     "info: updating entrypoint DOM with updated scripts/styles";
