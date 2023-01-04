@@ -6,6 +6,7 @@ export * from "./deleteFile";
 export * from "./renameFile";
 
 export * from "./copyFolder";
+export * from "./listFolders";
 export * from "./createFolder";
 export * from "./deleteFolder";
 

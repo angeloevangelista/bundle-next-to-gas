@@ -18,6 +18,8 @@ import {
 } from "./utils";
 
 async function generateGasBundle() {
+  const nextProjectRelativePath = "next-project";
+
   const load = loading({
     frames: ["⠇", "⠏", "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"],
   });
@@ -37,7 +39,7 @@ async function generateGasBundle() {
     __dirname,
     "..",
     "..",
-    "next-project"
+    nextProjectRelativePath
   );
 
   const nextProjectCopyPath = path.resolve(tempFolderPath, "next-project");
@@ -231,10 +233,10 @@ async function generateGasBundle() {
 
         const componentName = itsDeclarationDefaultExport
           ? line
-              .trim()
-              .split(" ")
-              .at(1)
-              ?.replace(/(\({|\()/gi, "")
+            .trim()
+            .split(" ")
+            .at(1)
+            ?.replace(/(\({|\()/gi, "")
           : line.replace(/;/gi, "").split(" ").pop();
 
         if (!itsDeclarationDefaultExport) {
@@ -639,6 +641,19 @@ async function generateGasBundle() {
 
   await Promise.all(updateLinksReferencesToBase64Promises);
 
+  load.succeed().start().text = "info: setting application URL on localStorage";
+  const setLocalStorageScriptElement = bundleEntryDOM.window.document.createElement(
+    "script",
+  );
+
+  setLocalStorageScriptElement.innerHTML = `
+    const userEmail = <?= Session.getEffectiveUser().getEmail()?>;
+
+    localStorage.setItem("GAS_DATA_USER_EMAIL", userEmail);
+  `;
+
+  bundleEntryDOM.window.document.body.appendChild(setLocalStorageScriptElement)
+
   load.succeed().start().text =
     "info: updating entrypoint DOM with updated scripts/styles";
   bundleEntryContent =
@@ -648,30 +663,36 @@ async function generateGasBundle() {
   await writeFile(bundleEntryPath, bundleEntryContent);
 
   load.succeed().start().text = "info: copying gas files to output folder";
-  const gasFilesPath = path.resolve(tempFolderPath, "gas");
+  const gasFilesDestinationPath = path.resolve(tempFolderPath, "gas");
+  const gasFilesToCopyPath = path.resolve(__dirname, "gas-scripts");
 
-  await createFolder(gasFilesPath);
+  await createFolder(gasFilesDestinationPath);
 
+  const gasScriptsToCopyPaths = await listFiles(gasFilesToCopyPath);
   const nextOutFirstLevelFilesPaths = await listFiles(staticBundlePath);
 
-  const copyFilesPromises = nextOutFirstLevelFilesPaths
-    .map(async (fileName) => {
-      await copyFile(
-        path.resolve(staticBundlePath, fileName),
-        path.resolve(gasFilesPath, fileName)
-      );
-    })
-    .concat([
-      copyFile(
-        path.resolve(__dirname, "..", "appsscript.json"),
-        path.resolve(gasFilesPath, "appsscript.json")
-      ),
+  let copyFilesPromises: Promise<void>[] = []
 
-      copyFile(
-        path.resolve(__dirname, "gas-scripts", "fileServer.ts"),
-        path.resolve(gasFilesPath, "fileServer.ts")
-      ),
-    ]);
+  copyFilesPromises.push(
+    copyFile(
+      path.resolve(__dirname, "..", "appsscript.json"),
+      path.resolve(gasFilesDestinationPath, "appsscript.json")
+    ),
+    ...nextOutFirstLevelFilesPaths
+      .map(async (fileName) => {
+        await copyFile(
+          path.resolve(staticBundlePath, fileName),
+          path.resolve(gasFilesDestinationPath, fileName)
+        );
+      }),
+    ...gasScriptsToCopyPaths
+      .map(async (fileName) => {
+        await copyFile(
+          path.resolve(gasFilesToCopyPath, fileName),
+          path.resolve(gasFilesDestinationPath, fileName)
+        );
+      }),
+  )
 
   await Promise.all(copyFilesPromises);
 
@@ -679,3 +700,5 @@ async function generateGasBundle() {
 }
 
 generateGasBundle();
+
+//if it doesn't work, You can set a variable with user email on first get
