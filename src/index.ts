@@ -650,8 +650,10 @@ async function generateGasBundle() {
     const appUrl = <?= ScriptApp.getService().getUrl()?>;
     const userEmail = <?= Session.getEffectiveUser().getEmail()?>;
 
-    localStorage.setItem("GAS_DATA_APP_URL", appUrl);
-    localStorage.setItem("GAS_DATA_USER_EMAIL", userEmail);
+    window.GAS_DATA = {
+      APP_URL: appUrl,
+      USER_EMAIL: userEmail,
+    }
   `;
 
   bundleEntryDOM.window.document.body.appendChild(setLocalStorageScriptElement)
