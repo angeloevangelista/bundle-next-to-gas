@@ -647,8 +647,10 @@ async function generateGasBundle() {
   );
 
   setLocalStorageScriptElement.innerHTML = `
+    const appUrl = <?= ScriptApp.getService().getUrl()?>;
     const userEmail = <?= Session.getEffectiveUser().getEmail()?>;
 
+    localStorage.setItem("GAS_DATA_APP_URL", appUrl);
     localStorage.setItem("GAS_DATA_USER_EMAIL", userEmail);
   `;
 
