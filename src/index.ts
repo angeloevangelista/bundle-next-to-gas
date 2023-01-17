@@ -89,14 +89,14 @@ async function generateGasBundle() {
         .split(path.sep)
         .map((p) => `${p.substring(0, 1).toUpperCase()}${p.substring(1)}`)
         .join("")
-        .replace(/(\[|])/g, '') + "Page";
+        .replace(/(\[|]|-)/g, "") + "Page";
 
     const componentImport = `const ${componentName} = require('.${partialPageComponentPath}').default;`;
 
-    const componentRouteElement = `<Route path="${partialPageComponentPath.replace(
-      /.tsx|\/index.tsx/gi,
-      ""
-    ).replace(/\[/g, ':').replace(/]/g, '')}" element={<${componentName} />} />`;
+    const componentRouteElement = `<Route path="${partialPageComponentPath
+      .replace(/.tsx|\/index.tsx/gi, "")
+      .replace(/\[/g, ":")
+      .replace(/]/g, "")}" element={<${componentName} />} />`;
 
     pagesImportations.push(componentImport);
     pagesRouteDeclarations.push(componentRouteElement);
@@ -234,10 +234,10 @@ async function generateGasBundle() {
 
         const componentName = itsDeclarationDefaultExport
           ? line
-            .trim()
-            .split(" ")
-            .at(1)
-            ?.replace(/(\({|\()/gi, "")
+              .trim()
+              .split(" ")
+              .at(1)
+              ?.replace(/(\({|\()/gi, "")
           : line.replace(/;/gi, "").split(" ").pop();
 
         if (!itsDeclarationDefaultExport) {
@@ -404,6 +404,16 @@ async function generateGasBundle() {
         return [...acc, line];
       }, []);
 
+      lines = lines.map((line) => {
+        const lineUsesQuery = /router.query/gi.test(line);
+
+        if (lineUsesQuery) {
+          line = line.replace(/router.query/gi, "(router.query as any)()");
+        }
+
+        return line;
+      });
+
       await writeFile(componentFilePath, lines.join("\n"));
     });
 
@@ -422,12 +432,9 @@ async function generateGasBundle() {
     `	 const [router, setRouter] = useState<NextRouter>();`,
     `	 const nextRouter = useRouter();`,
 
-    `	 const params = useParams();`,
     `	 const navigate = useNavigate();`,
     `	 const customRouter: NextRouter = {`,
-    `    query: {`,
-    `	     ...params,`,
-    `    },`,
+    `    query: useParams as Readonly<any>,`,
     `	 	 push(url, _, __) {`,
     `      return new Promise<boolean>((resolve, _) => {`,
     `	 	 		 navigate(url.toString());`,
@@ -647,9 +654,8 @@ async function generateGasBundle() {
   await Promise.all(updateLinksReferencesToBase64Promises);
 
   load.succeed().start().text = "info: setting application URL on localStorage";
-  const setGasDataScriptElement = bundleEntryDOM.window.document.createElement(
-    "script",
-  );
+  const setGasDataScriptElement =
+    bundleEntryDOM.window.document.createElement("script");
 
   setGasDataScriptElement.innerHTML = `
     const appUrl = <?= ScriptApp.getService().getUrl()?>;
@@ -661,7 +667,7 @@ async function generateGasBundle() {
     }
   `;
 
-  bundleEntryDOM.window.document.body.appendChild(setGasDataScriptElement)
+  bundleEntryDOM.window.document.body.appendChild(setGasDataScriptElement);
 
   load.succeed().start().text =
     "info: updating entrypoint DOM with updated scripts/styles";
@@ -680,28 +686,26 @@ async function generateGasBundle() {
   const gasScriptsToCopyPaths = await listFiles(gasFilesToCopyPath);
   const nextOutFirstLevelFilesPaths = await listFiles(staticBundlePath);
 
-  let copyFilesPromises: Promise<void>[] = []
+  let copyFilesPromises: Promise<void>[] = [];
 
   copyFilesPromises.push(
     copyFile(
       path.resolve(__dirname, "..", "appsscript.json"),
       path.resolve(gasFilesDestinationPath, "appsscript.json")
     ),
-    ...nextOutFirstLevelFilesPaths
-      .map(async (fileName) => {
-        await copyFile(
-          path.resolve(staticBundlePath, fileName),
-          path.resolve(gasFilesDestinationPath, fileName)
-        );
-      }),
-    ...gasScriptsToCopyPaths
-      .map(async (fileName) => {
-        await copyFile(
-          path.resolve(gasFilesToCopyPath, fileName),
-          path.resolve(gasFilesDestinationPath, fileName)
-        );
-      }),
-  )
+    ...nextOutFirstLevelFilesPaths.map(async (fileName) => {
+      await copyFile(
+        path.resolve(staticBundlePath, fileName),
+        path.resolve(gasFilesDestinationPath, fileName)
+      );
+    }),
+    ...gasScriptsToCopyPaths.map(async (fileName) => {
+      await copyFile(
+        path.resolve(gasFilesToCopyPath, fileName),
+        path.resolve(gasFilesDestinationPath, fileName)
+      );
+    })
+  );
 
   await Promise.all(copyFilesPromises);
 
