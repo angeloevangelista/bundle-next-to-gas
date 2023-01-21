@@ -653,21 +653,59 @@ async function generateGasBundle() {
 
   await Promise.all(updateLinksReferencesToBase64Promises);
 
-  load.succeed().start().text = "info: setting application URL on localStorage";
-  const setGasDataScriptElement =
+  load.succeed().start().text = "info: setting GAS_DATA on window";
+  const gasDataEnvironmentPath = path.resolve(
+    __dirname,
+    "..",
+    "gas_window.env"
+  );
+
+  const gasDataEnvironmentPathBuffer = await readFile(gasDataEnvironmentPath);
+
+  const gasDataEnvironment = gasDataEnvironmentPathBuffer
+    .toString()
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("#"))
+    .filter((line) => line.trim())
+    .map((line) => line.trim())
+    .reduce<string[]>(
+      (acc, next) =>
+        acc.includes(next.split("=").at(0)!) ? acc : [...acc, next],
+      []
+    );
+
+  const gasDataDeclarations = gasDataEnvironment
+    .map((variableLine) => {
+      const [key, ...restOfLine] = variableLine.split("=");
+
+      let variableValue = `${restOfLine.join("=").replace(/"/gi, '\\"')}`;
+
+      const isGoogleScriptTagNotation =
+        variableValue.startsWith("<?=") && variableValue.endsWith("?>");
+
+      if (!isGoogleScriptTagNotation) variableValue = `"${variableValue}"`;
+
+      return `  const GAS_${key} = ${variableValue};`;
+    })
+    .join("\n");
+
+  const setWindowsGasDataScriptElement =
     bundleEntryDOM.window.document.createElement("script");
 
-  setGasDataScriptElement.innerHTML = `
-    const appUrl = <?= ScriptApp.getService().getUrl()?>;
-    const userEmail = <?= Session.getEffectiveUser().getEmail()?>;
+  setWindowsGasDataScriptElement.innerHTML = [
+    "",
+    gasDataDeclarations,
+    "",
+    "  window.GAS_DATA = {",
+    gasDataEnvironment
+      .map((p) => `    ${p.split("=").at(0)}: GAS_${p.split("=").at(0)}`)
+      .join(",\n"),
+    "}",
+  ].join("\n");
 
-    window.GAS_DATA = {
-      APP_URL: appUrl,
-      USER_EMAIL: userEmail,
-    }
-  `;
-
-  bundleEntryDOM.window.document.body.appendChild(setGasDataScriptElement);
+  bundleEntryDOM.window.document.head.appendChild(
+    setWindowsGasDataScriptElement
+  );
 
   load.succeed().start().text =
     "info: updating entrypoint DOM with updated scripts/styles";
@@ -714,4 +752,3 @@ async function generateGasBundle() {
 
 generateGasBundle();
 
-//if it doesn't work, You can set a variable with user email on first get
