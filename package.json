@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://github.com/angeloevangelista/bundle-next-to-gas.git"
   },
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
@@ -17,15 +17,16 @@
     "prepublish": "tsc",
     "dev": "ts-node src/index.ts"
   },
-  "bin": "./dist/cli.js",
+  "bin": {
+    "bundle-next-to-gas": "./dist/cli.js"
+  },
   "dependencies": {
     "fs-extra": "^11.1.0",
     "jsdom": "^20.0.3",
     "loading-cli": "^1.1.0",
     "mime-types": "^2.1.35",
     "next": "^13.0.7",
-    "rimraf": "^3.0.2",
-    "ts-loader": "^9.4.2"
+    "rimraf": "^3.0.2"
   },
   "devDependencies": {
     "@types/fs-extra": "^9.0.13",
@@ -35,6 +36,7 @@
     "@types/node": "^18.11.15",
     "@types/rimraf": "^3.0.2",
     "clasp": "^1.0.0",
+    "ts-loader": "^9.4.2",
     "ts-node": "^10.9.1",
     "typescript": "^4.9.4",
     "webpack": "^5.75.0",
