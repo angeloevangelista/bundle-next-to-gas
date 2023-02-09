@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://github.com/angeloevangelista/bundle-next-to-gas.git"
   },
-  "version": "1.0.31",
+  "version": "1.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
