@@ -664,7 +664,7 @@ async function generateGasBundle(nextProjectPath: string, outputPath: string) {
       applicationEnvironmentPath
     );
 
-    applicationEnvironmentPathBuffer
+    const applicationEnvironmentFromEnvFile = applicationEnvironmentPathBuffer
       .toString()
       .split("\n")
       .filter((line) => !line.trim().startsWith("#"))
@@ -675,6 +675,8 @@ async function generateGasBundle(nextProjectPath: string, outputPath: string) {
           acc.includes(next.split("=").at(0)!) ? acc : [...acc, next],
         []
       );
+
+    applicationEnvironment.push(...applicationEnvironmentFromEnvFile);
   }
 
   const gasDataDeclarations = applicationEnvironment
