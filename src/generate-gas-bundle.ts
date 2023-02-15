@@ -18,7 +18,15 @@ import {
   checkIfPathExists,
 } from "./utils";
 
-async function generateGasBundle(nextProjectPath: string, outputPath: string) {
+type GenerateGasBundleParams = {
+  inputPath: string;
+  outputPath: string;
+  projectName?: string;
+}
+
+async function generateGasBundle(
+  { inputPath, outputPath, projectName }: GenerateGasBundleParams,
+) {
   const load = loading({
     frames: ["⠇", "⠏", "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"],
   });
@@ -39,7 +47,7 @@ async function generateGasBundle(nextProjectPath: string, outputPath: string) {
   const nextProjectCopyPath = path.resolve(tempFolderPath, "next-project");
 
   load.succeed().start().text = "info: copying next project to temp folder";
-  await copyFolder(nextProjectPath, nextProjectCopyPath, {
+  await copyFolder(inputPath, nextProjectCopyPath, {
     dereference: true,
     recursive: true,
   });
@@ -50,6 +58,20 @@ async function generateGasBundle(nextProjectPath: string, outputPath: string) {
       deleteFolder(path.resolve(nextProjectCopyPath, folder))
     )
   );
+
+  load.succeed().start().text = "info: evaluating project name";
+  if (!projectName?.trim()) {
+    const packageJsonFilePath = path.resolve(
+      nextProjectCopyPath,
+      "package.json",
+    );
+
+    const packageJsonFileBuffer = await readFile(packageJsonFilePath);
+
+    const packageJsonFileData = JSON.parse(packageJsonFileBuffer.toString());
+
+    projectName = packageJsonFileData.name;
+  }
 
   load.succeed().start().text = "info: creating routes.tsx component";
   const nextProjectCopyPagesPath = path.resolve(
@@ -228,10 +250,10 @@ async function generateGasBundle(nextProjectPath: string, outputPath: string) {
 
         const componentName = itsDeclarationDefaultExport
           ? line
-              .trim()
-              .split(" ")
-              .at(1)
-              ?.replace(/(\({|\()/gi, "")
+            .trim()
+            .split(" ")
+            .at(1)
+            ?.replace(/(\({|\()/gi, "")
           : line.replace(/;/gi, "").split(" ").pop();
 
         if (!itsDeclarationDefaultExport) {
@@ -648,7 +670,7 @@ async function generateGasBundle(nextProjectPath: string, outputPath: string) {
 
   await Promise.all(updateLinksReferencesToBase64Promises);
 
-  load.succeed().start().text = "info: setting .env on window";
+  load.succeed().start().text = "info: getting application environment variables";
 
   const applicationEnvironmentPath = path.resolve(nextProjectCopyPath, ".env");
 
@@ -679,6 +701,12 @@ async function generateGasBundle(nextProjectPath: string, outputPath: string) {
     applicationEnvironment.push(...applicationEnvironmentFromEnvFile);
   }
 
+  load.succeed().start().text = "info: creating gas variables file";
+
+  const gasFilesDestinationPath = path.resolve(tempFolderPath, "gas");
+
+  await createFolder(gasFilesDestinationPath);
+
   const gasDataDeclarations = applicationEnvironment
     .map((variableLine) => {
       const [key, ...restOfLine] = variableLine.split("=");
@@ -688,22 +716,43 @@ async function generateGasBundle(nextProjectPath: string, outputPath: string) {
       const isGoogleScriptTagNotation =
         variableValue.startsWith("<?=") && variableValue.endsWith("?>");
 
-      if (!isGoogleScriptTagNotation) variableValue = `"${variableValue}"`;
+      if (isGoogleScriptTagNotation) {
+        variableValue = variableValue.replace(/(<\?= |\?>)/gi, '')
+      } else {
+        variableValue = `"${variableValue}"`
+      };
 
-      return `  const GAS_${key} = ${variableValue};`;
-    })
-    .join("\n");
+      return `${key}: ${variableValue}`;
+    });
+
+  const gasVariablesFileContent = [
+    'const PUBLIC_DATA = {',
+    `  APPLICATION_NAME: "${projectName}",`,
+    gasDataDeclarations.map(p => `  ${p}`).join(",\n"),
+    '};',
+    '',
+    'const PRIVATE_DATA = {',
+    '};',
+  ].join("\n");
+
+
+  await writeFile(
+    path.resolve(gasFilesDestinationPath, "variables.js"),
+    gasVariablesFileContent,
+  );
+
+  load.succeed().start().text = "info: creating GAS_DATA object";
 
   const setWindowsGasDataScriptElement =
     bundleEntryDOM.window.document.createElement("script");
 
   setWindowsGasDataScriptElement.innerHTML = [
     "",
-    gasDataDeclarations,
-    "",
     "  window.GAS_DATA = {",
     applicationEnvironment
-      .map((p) => `    ${p.split("=").at(0)}: GAS_${p.split("=").at(0)}`)
+      .map((p) =>
+        `    ${p.split("=").at(0)}: "<?= PUBLIC_DATA.${p.split("=").at(0)}?>"`,
+      )
       .join(",\n"),
     "}",
   ].join("\n");
@@ -721,15 +770,17 @@ async function generateGasBundle(nextProjectPath: string, outputPath: string) {
   await writeFile(bundleEntryPath, bundleEntryContent);
 
   load.succeed().start().text = "info: copying gas files to output folder";
-  const gasFilesDestinationPath = path.resolve(tempFolderPath, "gas");
+
   const gasFilesToCopyPath = path.resolve(__dirname, "gas-scripts");
 
-  await createFolder(gasFilesDestinationPath);
 
   let gasScriptsToCopyPaths = await listFiles(gasFilesToCopyPath);
 
   gasScriptsToCopyPaths = gasScriptsToCopyPaths.filter(
-    (filePath) => mimeTypes.lookup(filePath) === "application/javascript"
+    (filePath) => [
+      // "video/mp2t", // for local tests
+      "application/javascript",
+    ].includes(String(mimeTypes.lookup(filePath)))
   );
 
   await writeFile(

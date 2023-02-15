@@ -3,52 +3,43 @@
 import { checkIfPathExists } from "./utils";
 import { generateGasBundle } from "./generate-gas-bundle";
 
-function logUsage(): void {
-  console.log("usage: bundle-next-to-gas <next-project-path> <output-path>");
-}
+import yargs from 'yargs'
+import { hideBin } from 'yargs/helpers'
 
-async function bundleApp() {
-  try {
-    const [, , ...args] = process.argv;
+yargs(hideBin(process.argv))
+  .command(
+    "bundle",
+    "Bundle a NextJs project into Google Apps Script Application",
+    (builderYargs) => {
+      builderYargs
+        .option("input", {
+          alias: "i",
+          description: "NextJs project path",
+          string: true,
+          demandOption: true,
+        })
+        .option("output", {
+          alias: "o",
+          description: "Where the bundled project will be saved",
+          string: true,
+          demandOption: true,
+        })
+        .option("name", {
+          alias: "n",
+          description: "Project name. Example: \"My App\"",
+          string: true,
+          demandOption: false,
+        });
 
-    const projectPath = args[0];
-    const outputPath = args[1];
-
-    const overrideOutput = args.some((p) =>
-      p?.toLocaleUpperCase().includes("--FORCE")
-    );
-
-    const askedForHelp = args[0]?.toUpperCase() === "HELP";
-
-    if (askedForHelp) {
-      logUsage();
-      process.exit(0);
-    }
-
-    if (!projectPath?.trim() || !outputPath?.trim()) {
-      logUsage();
-      process.exit(1);
-    }
-
-    const projectPathExists = await checkIfPathExists(projectPath);
-
-    if (!projectPathExists) {
-      throw new Error(`the project path does not exist: ${projectPath}`);
-    }
-
-    const outputPathExists = await checkIfPathExists(outputPath);
-
-    if (outputPathExists && !overrideOutput) {
-      throw new Error(
-        "error: the output path already exists. Use --force to override it."
-      );
-    }
-
-    await generateGasBundle(projectPath, outputPath);
-  } catch (error) {
-    console.error(error);
-    process.exit(1);
-  }
-}
-
-bundleApp();
+      return builderYargs
+    },
+    (handlerArgs) => {
+      generateGasBundle({
+        inputPath: handlerArgs.input as string,
+        outputPath: handlerArgs.output as string,
+        projectName: handlerArgs.name as string | undefined
+      })
+    },
+  )
+  .demandCommand(1)
+  .parse();

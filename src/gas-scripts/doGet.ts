@@ -11,8 +11,14 @@ function doGet(
   }
 
   if (requestEvent.pathInfo?.startsWith("api")) {
-    return handleApiRequest(requestEvent.pathInfo.replace("api", ''))
+    return handleApiRequest(requestEvent.pathInfo.replace("api", ''));
   }
 
-  return HtmlService.createTemplateFromFile("index").evaluate();
+  const applicationEntryTemplate = HtmlService
+    .createTemplateFromFile("index")
+    .evaluate();
+
+  applicationEntryTemplate.setTitle(PUBLIC_DATA.APPLICATION_NAME);
+
+  return applicationEntryTemplate;
 }
