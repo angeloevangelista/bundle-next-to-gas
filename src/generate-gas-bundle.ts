@@ -502,7 +502,10 @@ async function generateGasBundle(
 
   load.succeed().start().text = "info: building project";
   await executeCommand(
-    ["$(npm bin)/next build", "$(npm bin)/next export"].join(" && "),
+    [
+      "./node_modules/.bin/next build", 
+      "./node_modules/.bin/next export",
+    ].join(" && "),
     nextProjectCopyPath
   );
 
